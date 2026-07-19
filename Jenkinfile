@@ -1,0 +1,54 @@
+pipeline{
+    agent any
+    tools{
+        maven 'Maven' }
+
+    environment{
+        cred = credentials('aws-cred')
+        doc_cred = credentials('docker-cred')
+        DOCKER_IMAGE = "muskanoff06/Project-Docker-on-Jenkins"
+        DOCKER_TAG = "$BUILD_NUMBER"}
+
+    stages{
+        stage('Checkout code from GIT'){
+            steps{
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/muskanoff06/Project-Docker-on-Jenkins.git']])
+            }
+        }
+        stage('Maven package'){
+            steps{
+                sh 'mvn package'}
+        }
+
+        stage('Docker build'){
+            steps{
+                sh 'docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} .'
+            }
+
+        stage('DockerHub Push'){
+            steps{
+                    sh 'echo $doc_cred_PSW | docker login $doc_cred_USR --pasword-stdin'
+                    sh 'docker push ${DOCKER_IMAGE}:${BUILD_NUMBER} '
+                    
+                }
+            }
+        stage('Kubernetes Deploy'){
+            steps{
+                    sh 'aws eks update-kubeconfig --region us-east-1 --name my-cluster'
+                    sh 'kubectl apply -f Application.yaml'
+                }
+            }
+        post {
+          always {
+               echo 'Process Complete'
+                }
+          success {
+                echo 'This was success'
+                 }
+          failure {
+                echo 'It was a fail'
+                }
+                }
+    }
+    }
+}
